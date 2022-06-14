@@ -36,6 +36,7 @@ contract SingularityRouter is ISingularityRouter {
     }
 
     receive() external payable {
+    // @audit issue: use require
         assert(msg.sender == WETH);
     }
 
@@ -55,6 +56,7 @@ contract SingularityRouter is ISingularityRouter {
         emit Swap(msg.sender, tokenIn, tokenOut, amountIn, amountOut, to);
     }
 
+    // @audit info: can use swapExactTokensForTokens
     function swapExactETHForTokens(
         address tokenIn,
         address tokenOut,
@@ -62,6 +64,7 @@ contract SingularityRouter is ISingularityRouter {
         address to,
         uint256 deadline
     ) external payable override ensure(deadline) returns (uint256 amountOut) {
+        // @audit info: can remove tokenIn from arguments
         require(tokenIn == WETH, "SingularityRouter: INVALID_IN_TOKEN");
         (amountOut, , , , ) = getAmountOut(msg.value, tokenIn, tokenOut);
         require(amountOut >= minAmountOut, "SingularityRouter: INSUFFICIENT_OUTPUT_AMOUNT");
@@ -79,6 +82,7 @@ contract SingularityRouter is ISingularityRouter {
         address to,
         uint256 deadline
     ) external override ensure(deadline) returns (uint256 amountOut) {
+        // @audit info: can remove tokenIn from arguments
         require(tokenOut == WETH, "SingularityRouter: INVALID_OUT_TOKEN");
         (amountOut, , , , ) = getAmountOut(amountIn, tokenIn, tokenOut);
         require(amountOut >= minAmountOut, "SingularityRouter: INSUFFICIENT_OUTPUT_AMOUNT");
@@ -104,6 +108,7 @@ contract SingularityRouter is ISingularityRouter {
         ISingularityPool(poolOut).swapOut(amountOut, to);
     }
 
+    // @audit info: missing Natspec
     function addLiquidity(
         address token,
         uint256 amount,
@@ -115,6 +120,7 @@ contract SingularityRouter is ISingularityRouter {
         liquidity = _addLiquidity(token, amount, minLiquidity, to);
     }
 
+    // @audit info: missing Natspec
     function addLiquidityETH(
         uint256 minLiquidity,
         address to,
@@ -131,6 +137,7 @@ contract SingularityRouter is ISingularityRouter {
         address to
     ) internal returns (uint256 liquidity) {
         address pool = poolFor(token);
+        // @audit gas: give infinite approval
         IERC20(token).safeIncreaseAllowance(pool, amount);
         liquidity = ISingularityPool(pool).deposit(amount, to);
         require(liquidity >= minLiquidity, "SingularityRouter: INSUFFICIENT_LIQUIDITY_AMOUNT");

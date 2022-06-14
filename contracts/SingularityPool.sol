@@ -63,8 +63,12 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
         require(amount + liabilities <= depositCap, "SingularityPool: DEPOSIT_EXCEEDS_CAP");
 
         // Transfer token from sender
+        // @audit info: this is not protected against deflationary tokens, and tokens like USDT which
+        // can turn on fee in future. the receiver receives amount - fee.
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
+        // @audit issue: is it susceptible to sandwich attack?
+        // frontrun it, and then after this txn, withdraw liquidity
         if (liabilities == 0) {
             mintAmount = amount;
 
@@ -105,6 +109,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
         nonReentrant
         returns (uint256 withdrawalAmount)
     {
+        // @audit issue: susceptible to sandwich attack? withdraw before and deposit after.
         require(lpAmount != 0, "SingularityPool: AMOUNT_IS_0");
 
         // Store current price-per-share
@@ -182,6 +187,8 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
         // Apply slippage (-)
         uint256 slippage = getSlippageOut(amount);
         require(amount > slippage, "SingularityPool: SLIPPAPGE_EXCEEDS_AMOUNT");
+
+        // @audit gas: use unchecked
         uint256 amountPostSlippage = amount - slippage;
 
         // Apply trading fees
@@ -249,6 +256,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
 
         (uint256 tokenPrice, ) = getOracleData();
         value = amount.mulWadDown(tokenPrice);
+        // @audit gas: can use unchecked
         if (decimals <= 18) {
             value *= 10**(18 - decimals);
         } else {
@@ -297,6 +305,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
 
         // check underflow
         if (feeA > feeB) {
+            // @audit gas: use unchecked
             fee = feeA - feeB;
             require(fee < amount, "SingularityPool: FEE_EXCEEDS_AMOUNT");
         } else {
@@ -329,7 +338,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
             feeA = _getG(1 ether).mulWadUp(amount) + gAfter.mulWadUp(_liabilities - amount);
             feeB = gCurrent.mulWadDown(_liabilities);
         }
-        
+
         // check underflow
         if (feeA > feeB) {
             fee = feeA - feeB;
@@ -438,6 +447,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
     ///          (collateralization ratio) ^ 8
     ///
     function _getG(uint256 collateralizationRatio) internal pure returns (uint256 g) {
+        // @audit note: understand this if clause
         if (collateralizationRatio < 0.3 ether) {
             return 0.43 ether - collateralizationRatio;
         }
