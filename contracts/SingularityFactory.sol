@@ -10,6 +10,7 @@ import "./SingularityPool.sol";
  * @author Revenant Labs
  */
 contract SingularityFactory is ISingularityFactory {
+    // @audit info: missing documentation for public variables
     string public override tranche;
     address public override admin;
     address public override oracle;
@@ -28,6 +29,7 @@ contract SingularityFactory is ISingularityFactory {
         _;
     }
 
+    // @audit gas: use custom errors
     constructor(
         string memory _tranche,
         address _admin,
@@ -69,6 +71,7 @@ contract SingularityFactory is ISingularityFactory {
         require(baseFee != 0, "SingularityFactory: FEE_IS_0");
         require(getPool[token] == address(0), "SingularityFactory: POOL_EXISTS");
 
+        // @audit gas: pass poolparams as calldata to SingularityPool instead of saving to storage.
         poolParams = PoolParams({factory: address(this), token: token, isStablecoin: isStablecoin, baseFee: baseFee});
         pool = address(new SingularityPool{salt: keccak256(abi.encodePacked(token))}());
         delete poolParams;
@@ -78,6 +81,7 @@ contract SingularityFactory is ISingularityFactory {
         emit PoolCreated(token, isStablecoin, baseFee, pool, allPools.length);
     }
 
+    // @audit info: use two step role change process
     function setAdmin(address _admin) external override onlyAdmin {
         require(_admin != address(0), "SingularityFactory: ZERO_ADDRESS");
         admin = _admin;
@@ -108,6 +112,7 @@ contract SingularityFactory is ISingularityFactory {
         oracleSens = _oracleSens;
     }
 
+    // @audit issue: can run OOG if too many pools are created
     function collectFees() external override onlyAdmin {
         uint256 length = allPools.length;
         for (uint256 i; i < length; ) {
@@ -120,6 +125,7 @@ contract SingularityFactory is ISingularityFactory {
 
     function setDepositCaps(address[] calldata tokens, uint256[] calldata caps) external override onlyAdmin {
         require(tokens.length == caps.length, "SingularityFactory: NOT_SAME_LENGTH");
+        // @audit gas: reading from calldata is cheaper than from memory. Directly use tokens.length
         uint256 length = tokens.length;
         for (uint256 i; i < length; ) {
             address pool = getPool[tokens[i]];
@@ -133,6 +139,7 @@ contract SingularityFactory is ISingularityFactory {
 
     function setBaseFees(address[] calldata tokens, uint256[] calldata baseFees) external override onlyAdmin {
         require(tokens.length == baseFees.length, "SingularityFactory: NOT_SAME_LENGTH");
+        // @audit gas: reading from calldata is cheaper than from memory. Directly use tokens.length
         uint256 length = tokens.length;
         for (uint256 i; i < length; ) {
             require(baseFees[i] != 0, "SingularityFactory: BASE_FEE_IS_0");
@@ -147,6 +154,7 @@ contract SingularityFactory is ISingularityFactory {
 
     function setPaused(address[] calldata tokens, bool[] calldata states) external override onlyAdmin {
         require(tokens.length == states.length, "SingularityFactory: NOT_SAME_LENGTH");
+        // @audit gas: reading from calldata is cheaper than from memory. Directly use tokens.length
         uint256 length = tokens.length;
         for (uint256 i; i < length; ) {
             address pool = getPool[tokens[i]];
@@ -158,6 +166,7 @@ contract SingularityFactory is ISingularityFactory {
         }
     }
 
+    // @audit issue: can run OOG if too many pools are created
     function setPausedForAll(bool state) external override onlyAdmin {
         uint256 length = allPools.length;
         for (uint256 i; i < length; ) {
