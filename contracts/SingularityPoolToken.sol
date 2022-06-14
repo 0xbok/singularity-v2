@@ -9,6 +9,7 @@ import "./interfaces/ISingularityPoolToken.sol";
  * @author Revenant Labs
  * @author Modified from Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/tokens/ERC20.sol)
  */
+// @audit issue: inherit from rari's erc20 and then add new functions
 abstract contract SingularityPoolToken is ISingularityPoolToken {
     string public override name;
     string public override symbol;
