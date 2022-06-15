@@ -132,4 +132,25 @@ contract ContractTest is Test {
     function testCorrectViewReturnValues() public {
         assertEq(factory.tranche(), "Tranche A");
     }
+
+    function testDepositSandwich() public {
+        ethPool.deposit(1e18, address(this));
+
+        console.log("deposit fee", ethPool.getDepositFee(100e18));
+        console.log("pre g", ethPool._getG(ethPool.getCollateralizationRatio()));
+
+        (uint256 _assets, uint256 _liabilities) = ethPool.getAssetsAndLiabilities();
+        console.log("post g", ethPool._calcCollatalizationRatio(_assets+100e18, _liabilities+100e18));
+
+        eth.transfer(otherAddr, 1e18);
+        vm.startPrank(otherAddr);
+        eth.approve(address(ethPool), type(uint).max);
+        ethPool.deposit(1e18, otherAddr);
+        vm.stopPrank();
+
+        // ethPool.withdraw(1000, address(this));
+        console.log(eth.balanceOf(address(this)));
+        console.log(ethPool.protocolFees());
+
+    }
 }
