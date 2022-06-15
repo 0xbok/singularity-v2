@@ -134,7 +134,7 @@ contract ContractTest is Test {
     }
 
     function testDepositSandwich() public {
-        ethPool.deposit(1e18, address(this));
+        ethPool.deposit(10e18, address(this));
 
         console.log("deposit fee", ethPool.getDepositFee(100e18));
         console.log("pre g", ethPool._getG(ethPool.getCollateralizationRatio()));
@@ -151,6 +151,30 @@ contract ContractTest is Test {
         // ethPool.withdraw(1000, address(this));
         console.log(eth.balanceOf(address(this)));
         console.log(ethPool.protocolFees());
+    }
 
+    function testSandwichZoom() public {
+        // two pools
+        // set up an eth pool of cRatio = 0.43
+        // liabilities in the pool = 100eth
+        // assets = 43 eth
+        // large withdraw 5 eth on a hugely undercollaterized pool of eth
+        // how can an attacker benefit here?
+        // swap -> out : eth, in : usdc (overcollaterized)
+        // pre-attack: usdc(undercollaterized) -> eth
+        // post-attack: eth -> dai (overcollaterized)
+
+        // withdraw || withdraw || deposit
+        // swap || deposit || swap
+    }
+
+    function testNormalWithdraw() public {
+        // two pools
+        // user deposits 5 eth
+        // set up an eth pool of cRatio = 0.43
+        // liabilities in the pool = 100eth
+        // assets = 43 eth
+        // user withdraws 5 eth
+        // check how much eth is actually withdrawn
     }
 }
