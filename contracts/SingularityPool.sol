@@ -150,6 +150,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
         IERC20(token).safeTransferFrom(msg.sender, address(this), amountIn);
 
         // Update assets
+        // @audit gas: update assets together with line 160
         assets += amountIn;
 
         // Apply trading fees
@@ -446,7 +447,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
     ///     g = -------------------------------
     ///          (collateralization ratio) ^ 8
     ///
-    function _getG(uint256 collateralizationRatio) internal pure returns (uint256 g) {
+    function _getG(uint256 collateralizationRatio) public pure returns (uint256 g) {
         // @audit note: understand this if clause
         if (collateralizationRatio < 0.3 ether) {
             return 0.43 ether - collateralizationRatio;
@@ -458,7 +459,7 @@ contract SingularityPool is ISingularityPool, SingularityPoolToken, ReentrancyGu
     }
 
     function _calcCollatalizationRatio(uint256 _assets, uint256 _liabilities)
-        internal
+        public
         pure
         returns (uint256 afterCollateralizationRatio)
     {
