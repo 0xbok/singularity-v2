@@ -4,6 +4,7 @@ pragma solidity ^0.8.14;
 
 import "./interfaces/ISingularityOracle.sol";
 import "./interfaces/IChainlinkFeed.sol";
+import "forge-std/console.sol";
 
 /**
  * @title Singularity Oracle

