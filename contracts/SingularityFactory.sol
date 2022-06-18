@@ -29,7 +29,7 @@ contract SingularityFactory is ISingularityFactory {
         _;
     }
 
-    // @audit gas: use custom errors
+    // @audit gas: use custom errors or at least require string < 32bytes
     constructor(
         string memory _tranche,
         address _admin,
