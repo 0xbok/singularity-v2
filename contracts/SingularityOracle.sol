@@ -41,6 +41,7 @@ contract SingularityOracle is ISingularityOracle {
         PriceData[] memory prices = allPrices[token];
         price = prices[prices.length - 1].price;
         uint256 priceDiff = price > chainlinkPrice ? price - chainlinkPrice : chainlinkPrice - price;
+        // @audit issue: remove 100 from denominator
         uint256 percentDiff = (priceDiff * 1 ether) / (price * 100);
         require(percentDiff <= maxPriceTolerance, "SingularityOracle: PRICE_DIFF_EXCEEDS_TOLERANCE");
         updatedAt = prices[prices.length - 1].updatedAt;
@@ -89,6 +90,7 @@ contract SingularityOracle is ISingularityOracle {
 
     function pushPrices(address[] calldata tokens, uint256[] calldata prices) external {
         require(tokens.length == prices.length, "SingularityOracle: NOT_SAME_LENGTH");
+        // @audit gas: no need to load calldata array's length in memory.
         uint256 length = tokens.length;
         for (uint256 i; i < length; ) {
             pushPrice(tokens[i], prices[i]);
