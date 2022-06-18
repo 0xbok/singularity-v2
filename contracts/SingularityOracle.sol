@@ -46,6 +46,21 @@ contract SingularityOracle is ISingularityOracle {
         updatedAt = prices[prices.length - 1].updatedAt;
     }
 
+    /// @dev Validates price is within bounds of reported Chainlink price
+    function getLatestRoundStorage(address token) public view returns (uint256 price, uint256 updatedAt) {
+        (uint256 chainlinkPrice, uint256 _updatedAt) = _getChainlinkData(token);
+        require(chainlinkPrice != 0, "SingularityOracle: CHAINLINK_PRICE_IS_0");
+        if (onlyUseChainlink) {
+            return (chainlinkPrice, block.timestamp); // change to _updatedAt in prod
+        }
+        PriceData[] storage prices = allPrices[token];
+        price = prices[prices.length - 1].price;
+        uint256 priceDiff = price > chainlinkPrice ? price - chainlinkPrice : chainlinkPrice - price;
+        uint256 percentDiff = (priceDiff * 1 ether) / (price * 100);
+        require(percentDiff <= maxPriceTolerance, "SingularityOracle: PRICE_DIFF_EXCEEDS_TOLERANCE");
+        updatedAt = prices[prices.length - 1].updatedAt;
+    }
+
     function getLatestRounds(address[] calldata tokens)
         external
         view
