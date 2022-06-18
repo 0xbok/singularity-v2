@@ -11,11 +11,17 @@ import {TestChainlinkFeed} from "contracts/testing/TestChainlinkFeed.sol";
 import {TestERC20} from "contracts/testing/TestERC20.sol";
 import {WFTM} from "contracts/testing/TestWFTM.sol";
 
-contract ContractTest is Test {
-    WFTM public wftm;
-    TestERC20 public eth;
-    TestERC20 public usdc;
-    TestERC20 public dai;
+struct PriceData {
+    uint256 price;
+    uint256 updatedAt;
+    uint256 nonce;
+}
+
+abstract contract BaseState is Test {
+    WFTM public immutable wftm;
+    TestERC20 public immutable eth;
+    TestERC20 public immutable usdc;
+    TestERC20 public immutable dai;
 
     SingularityOracle public oracle;
     SingularityFactory public factory;
@@ -32,43 +38,48 @@ contract ContractTest is Test {
     TestChainlinkFeed public daiFeed;
 
     // fee receiver
-    address otherAddr = genAddr("otherAddr");
-    address constant attacker = address(0xbadd00d);
-    address constant victim = address(0xb0ffed);
+    address public immutable otherAddr;
+    address public constant attacker = address(0xbadd00d);
+    address public constant victim = address(0xb0ffed);
 
     address[] public assetArray;
     uint256[] public priceArray;
     uint256[] public initialQtyFactorArray;
 
-    function setUp() public {
-        // deploy test tokens
+    constructor() {
         wftm = new WFTM();
+        eth = new TestERC20("Ethereum", "ETH", 18);
+        usdc = new TestERC20("USC Coin", "USDC", 6);
+        dai = new TestERC20("Dai Stablecoin", "DAI", 18);
+
+        otherAddr = genAddr("otherAddr");
+    }
+
+    function setUp() public virtual {
+        // deploy test tokens
         vm.deal(address(this), 10_000_000 ether);
         wftm.deposit{value: 10_000_000 ether}();
 
-        eth = new TestERC20("Ethereum", "ETH", 18);
         eth.mint(address(this), 10_000_000 * (10**eth.decimals()));
 
-        usdc = new TestERC20("USC Coin", "USDC", 6);
         usdc.mint(address(this), 10_000_000 * (10**usdc.decimals()));
 
-        dai = new TestERC20("Dai Stablecoin", "DAI", 18);
         dai.mint(address(this), 10_000_000 * (10**dai.decimals()));
 
         // deploy oracle
         oracle = new SingularityOracle(address(this));
         oracle.setPusher(address(this), true);
-        oracle.setOnlyUseChainlink(true);
+        oracle.setOnlyUseChainlink(false);
 
         assetArray.push(address(wftm));
         assetArray.push(address(eth));
         assetArray.push(address(usdc));
         assetArray.push(address(dai));
 
-        priceArray.push(2);
-        priceArray.push(2000);
-        priceArray.push(1);
-        priceArray.push(1);
+        priceArray.push(2 * 1e18);
+        priceArray.push(2000 * 1e18);
+        priceArray.push(1 * 1e18);
+        priceArray.push(1 * 1e18);
 
         initialQtyFactorArray.push(1);
         initialQtyFactorArray.push(1);
@@ -119,7 +130,7 @@ contract ContractTest is Test {
         factory.setDepositCaps(assetArray1, capArray);
 
         // approvals
-        for (uint x; x < assetArray.length; ++x) {
+        for (uint256 x; x < assetArray.length; ++x) {
             address asset = assetArray[x];
             TestERC20(asset).approve(factory.getPool(asset), type(uint256).max);
             TestERC20(asset).approve(address(router), type(uint256).max);
@@ -214,13 +225,12 @@ contract ContractTest is Test {
     //     // swap || deposit || swap
     // }
 
-
     // "Normal" collateralization ratios for reference
     // uint256 constant public newEthAssets = 1000 * 1e18;
     // uint256 constant public newDaiAssets = 1000 * 2000 * 1e18;
 
-    uint256 constant public newEthAssets = 500 * 1e18;
-    uint256 constant public newDaiAssets = 500 * 2000 * 1e18;
+    uint256 public constant newEthAssets = 500 * 1e18;
+    uint256 public constant newDaiAssets = 500 * 2000 * 1e18;
 
     function _tweakCollateralizationRatios() public {
         _setAssets(address(ethPool), newEthAssets);
@@ -228,7 +238,9 @@ contract ContractTest is Test {
 
         _displayViewReturnValues();
     }
+}
 
+contract ContractTest is BaseState {
     function testNormalWithdraw() public {
         _tweakCollateralizationRatios();
 
@@ -265,7 +277,7 @@ contract ContractTest is Test {
         vm.prank(victim);
         ethPool.withdraw(lpBalance, victim);
         console.log("victim withdraws", eth.balanceOf(victim) / 1e18);
-        console.log("(without sandwich, victim could have withdrawn)", uint(89942297439575197000) / 1e18);
+        console.log("(without sandwich, victim could have withdrawn)", uint256(89942297439575197000) / 1e18);
 
         //back run
         console.log("attacker back runs, swaps all eth for usdc (usdc is overcolatteralized pool)");
@@ -284,5 +296,38 @@ contract ContractTest is Test {
         console.log("after back run attacker eth", eth.balanceOf(address(attacker)) / 1e18);
         console.log("after back run attacker dai", dai.balanceOf(address(attacker)) / 1e18);
         console.log("profit: ", dai.balanceOf(address(attacker)) / 1e18 - 200_000);
+    }
+
+    function testGetLatestRoundWith1Prices() public {
+        oracle.getLatestRound(address(eth));
+    }
+}
+
+contract With100Prices is BaseState {
+    function setUp() public virtual override {
+        super.setUp();
+        for (uint256 x; x < 100; ++x) {
+            oracle.pushPrices(assetArray, priceArray);
+        }
+    }
+
+    function testGetLatestRoundWith100Prices() public {
+        oracle.getLatestRound(address(eth));
+    }
+}
+
+contract With1000Prices is BaseState {
+    function setUp() public virtual override {
+        super.setUp();
+        for (uint256 x; x < 1000; ++x) {
+            oracle.pushPrices(assetArray, priceArray);
+        }
+    }
+
+    function testGetLatestRoundWith1000Prices() public {
+        oracle.getLatestRound(address(eth));
+    }
+    function testGetLatestRoundWith1000PriceSTORAGE() public {
+        oracle.getLatestRoundStorage(address(eth));
     }
 }
