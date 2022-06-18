@@ -301,6 +301,20 @@ contract ContractTest is BaseState {
     function testGetLatestRoundWith1Prices() public {
         oracle.getLatestRound(address(eth));
     }
+
+    function testOraclePriceDiff() public {
+        uint256 price = 1e8;
+        uint256 chainlinkPrice = 1.1e8;
+        uint256 maxPriceTolerance = 0.015 ether;
+
+        uint256 priceDiff = price > chainlinkPrice ? price - chainlinkPrice : chainlinkPrice - price;
+        uint256 percentDiff = (priceDiff * 1 ether) / (price * 100);
+
+        console.log(priceDiff);
+        console.log(percentDiff);
+        console.log("percentDiff should be greater than maxPriceTolerance");
+        console.log(percentDiff > maxPriceTolerance);
+    }
 }
 
 contract With100Prices is BaseState {
