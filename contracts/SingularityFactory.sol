@@ -66,7 +66,7 @@ contract SingularityFactory is ISingularityFactory {
         address token,
         bool isStablecoin,
         uint256 baseFee
-    ) external override onlyAdmin returns (address pool) {
+    ) external override returns (address pool) {
         require(token != address(0), "SingularityFactory: ZERO_ADDRESS");
         require(baseFee != 0, "SingularityFactory: FEE_IS_0");
         require(getPool[token] == address(0), "SingularityFactory: POOL_EXISTS");
@@ -87,7 +87,7 @@ contract SingularityFactory is ISingularityFactory {
         admin = _admin;
     }
 
-    function setOracle(address _oracle) external override onlyAdmin {
+    function setOracle(address _oracle) external override {
         require(_oracle != address(0), "SingularityFactory: ZERO_ADDRESS");
         oracle = _oracle;
     }
@@ -137,6 +137,9 @@ contract SingularityFactory is ISingularityFactory {
         }
     }
 
+    function setDepositCap(address pool, uint256 cap) external {
+        ISingularityPool(pool).setDepositCap(cap);
+    }
     function setBaseFees(address[] calldata tokens, uint256[] calldata baseFees) external override onlyAdmin {
         require(tokens.length == baseFees.length, "SingularityFactory: NOT_SAME_LENGTH");
         // @audit gas: reading from calldata is cheaper than from memory. Directly use tokens.length
