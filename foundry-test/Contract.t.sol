@@ -191,40 +191,6 @@ abstract contract BaseState is Test {
         // adjust
     }
 
-    // function testDepositSandwich() public {
-    //     ethPool.deposit(10e18, address(this));
-
-    //     console.log("deposit fee", ethPool.getDepositFee(100e18));
-    //     console.log("pre g", ethPool._getG(ethPool.getCollateralizationRatio()));
-
-    //     (uint256 _assets, uint256 _liabilities) = ethPool.getAssetsAndLiabilities();
-    //     console.log("post g", ethPool._calcCollatalizationRatio(_assets + 100e18, _liabilities + 100e18));
-
-    //     eth.transfer(otherAddr, 1e18);
-    //     vm.startPrank(otherAddr);
-    //     eth.approve(address(ethPool), type(uint256).max);
-    //     ethPool.deposit(1e18, otherAddr);
-    //     vm.stopPrank();
-
-    //     // ethPool.withdraw(1000, address(this));
-    //     console.log(eth.balanceOf(address(this)));
-    //     console.log(ethPool.protocolFees());
-    // }
-
-    // function testSandwichZoom() public {
-    //     // two pools
-    //     // set up an eth pool of cRatio = 0.43
-    //     // liabilities in the pool = 100eth
-    //     // assets = 43 eth
-    //     // large withdraw 5 eth on a hugely undercollaterized pool of eth
-    //     // how can an attacker benefit here?
-    //     // swap -> out : eth, in : usdc (overcollaterized)
-    //     // pre-attack: usdc(undercollaterized) -> eth
-    //     // post-attack: eth -> dai (overcollaterized)
-    //     // withdraw || withdraw || deposit
-    //     // swap || deposit || swap
-    // }
-
     // "Normal" collateralization ratios for reference
     // uint256 constant public newEthAssets = 1000 * 1e18;
     // uint256 constant public newDaiAssets = 1000 * 2000 * 1e18;
@@ -241,6 +207,24 @@ abstract contract BaseState is Test {
 }
 
 contract ContractTest is BaseState {
+
+    function testSwapOne() public {
+        address receiver = genAddr("testOneSwap");
+        console.log("dai assets", daiPool.assets());
+        console.log("usdc assets", usdcPool.assets());
+        console.log("dai cratio", daiPool.getCollateralizationRatio());
+        console.log("usdc cratio", usdcPool.getCollateralizationRatio());
+        router.swapExactTokensForTokens(address(dai), address(usdc), 1600000 * (10**dai.decimals()), 0, receiver, block.timestamp + 7 days);
+        console.log(usdc.balanceOf(receiver));
+    }
+
+    function testSwapTwo() public {
+        address receiver = genAddr("testOneSwap");
+        router.swapExactTokensForTokens(address(dai), address(usdc), 800000 * (10**dai.decimals()), 0, receiver, block.timestamp + 7 days);
+        router.swapExactTokensForTokens(address(dai), address(usdc), 800000 * (10**dai.decimals()), 0, receiver, block.timestamp + 7 days);
+        console.log(usdc.balanceOf(receiver));
+    }
+
     function testNormalWithdraw() public {
         _tweakCollateralizationRatios();
 
